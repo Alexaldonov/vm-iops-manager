@@ -35,7 +35,7 @@ case the browser doesn't open on its own) along with the browser UI.
 Closing the console window stops the server.
 
 No installation, PowerShell, or PowerCLI is required — all the vCenter
-request code (govmomi, VMware's official Go library) is embedded in the exe.
+request code ([govmomi](https://github.com/vmware/govmomi), VMware's official Go library) is embedded in the exe.
 
 ## Interface features
 
