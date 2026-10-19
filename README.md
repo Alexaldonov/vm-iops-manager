@@ -8,6 +8,7 @@ Replace for [PowerShell/WinForms-script](https://github.com/Alexaldonov/vSphere-
 it's a single exe (~14 MB, no PowerCLI needed), starts in under a second, and its interface is a web
 page that opens in the default browser.
 The functionality has been expanded compared to my old utility.
+Also compatible with vCenter 7.
 
 ## How it works
 
