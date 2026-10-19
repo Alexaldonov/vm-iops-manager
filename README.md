@@ -3,9 +3,11 @@
 English | [Русский](README.ru.md)
 
 A tool for managing the IOPS limit on virtual machine disks in vCenter 8,
-where this capability was removed from the UI. It's a single exe (~14 MB,
-no PowerCLI needed), starts in under a second, and its interface is a web
+where this capability was removed from the UI. 
+Replace for [PowerShell/WinForms-script](https://github.com/Alexaldonov/vSphere-8-IOPS-Manager): 
+it's a single exe (~14 MB, no PowerCLI needed), starts in under a second, and its interface is a web
 page that opens in the default browser.
+The functionality has been expanded compared to my old utility.
 
 ## How it works
 
