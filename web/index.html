@@ -1,0 +1,1337 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VM IOPS Manager</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e2e4e9;
+    --text: #1b1f27;
+    --muted: #6b7280;
+    --accent: #3b6fe0;
+    --accent-hover: #2f5bc4;
+    --danger: #d33d3d;
+    --danger-hover: #b52f2f;
+    --success: #1f9254;
+    --warn: #b5790a;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161a;
+      --panel: #1c1f26;
+      --border: #2b2f38;
+      --text: #e7e9ee;
+      --muted: #9aa1ad;
+      --accent: #5b8bf0;
+      --accent-hover: #79a1f5;
+      --danger: #e35b5b;
+      --danger-hover: #ea7a7a;
+      --success: #3cc17e;
+      --warn: #d99a2b;
+      --shadow: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a;
+    --panel: #1c1f26;
+    --border: #2b2f38;
+    --text: #e7e9ee;
+    --muted: #9aa1ad;
+    --accent: #5b8bf0;
+    --accent-hover: #79a1f5;
+    --danger: #e35b5b;
+    --danger-hover: #ea7a7a;
+    --success: #3cc17e;
+    --warn: #d99a2b;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 20px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .vcenter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .vc-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--bg); cursor: pointer; font-size: 13px; white-space: nowrap;
+  }
+  .vc-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .vc-pill .x { opacity: .6; padding-left: 2px; }
+  .vc-pill .x:hover { opacity: 1; }
+  .vc-add {
+    padding: 6px 12px; border-radius: 999px; border: 1px dashed var(--border);
+    background: transparent; color: var(--muted); cursor: pointer; font-size: 13px;
+  }
+  .vc-add:hover { color: var(--text); border-color: var(--accent); }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=password], input[type=number] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); font-size: 14px;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .row { display: flex; gap: 12px; }
+  .row > * { flex: 1; }
+
+  button {
+    cursor: pointer; border: none; border-radius: 8px; padding: 8px 14px;
+    font-size: 13px; font-weight: 500; background: var(--accent); color: #fff;
+  }
+  button:hover { background: var(--accent-hover); }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+  button.danger { background: var(--danger); }
+  button.danger:hover { background: var(--danger-hover); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.small { padding: 4px 10px; font-size: 12px; }
+
+  .search-row { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; }
+  .search-row .field { flex: 1; }
+  .radio-group { display: flex; gap: 14px; align-items: center; height: 36px; }
+  .radio-group label { display: flex; align-items: center; gap: 5px; color: var(--text); font-size: 13px; margin: 0; cursor: pointer; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: var(--bg); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+  .badge.on { background: rgba(31,146,84,.15); color: var(--success); }
+  .badge.off { background: rgba(107,114,128,.15); color: var(--muted); }
+  .badge.used { background: rgba(31,146,84,.15); color: var(--success); }
+  .badge.zombie { background: rgba(211,61,61,.15); color: var(--danger); font-weight: 600; }
+  .badge.unknown-type { background: rgba(107,114,128,.15); color: var(--muted); }
+  .badge.warn { background: rgba(181,121,10,.15); color: var(--warn); font-weight: 600; }
+  code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+  .limit-cell { display: flex; align-items: center; gap: 6px; }
+  .limit-cell input { width: 110px; padding: 5px 8px; }
+  .limit-unlimited { color: var(--muted); font-style: italic; }
+
+  .toast {
+    position: fixed; top: 20px; left: 50%; max-width: 480px; min-width: 260px;
+    padding: 14px 18px; border-radius: 8px; box-shadow: var(--shadow);
+    font-size: 14px; font-weight: 500; color: #fff; opacity: 0;
+    transform: translate(-50%, -12px); display: flex; align-items: flex-start; gap: 10px;
+    transition: opacity .2s, transform .2s; pointer-events: none; z-index: 60;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast.ok { background: var(--success); }
+  .toast.err { background: var(--danger); }
+  .toast .toast-msg { flex: 1; line-height: 1.4; }
+  .toast .toast-close {
+    cursor: pointer; opacity: .8; font-size: 16px; line-height: 1; margin-top: 1px;
+  }
+  .toast .toast-close:hover { opacity: 1; }
+
+  .modal-error {
+    background: rgba(211,61,61,.12); color: var(--danger); border: 1px solid rgba(211,61,61,.35);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-bottom: 12px; line-height: 1.4;
+  }
+
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    align-items: center; justify-content: center; z-index: 40;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--panel); border-radius: var(--radius); padding: 20px;
+    width: 360px; box-shadow: var(--shadow);
+  }
+  .modal h2 { margin: 0 0 14px; font-size: 16px; }
+  .modal .field { margin-bottom: 12px; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .checkbox-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .checkbox-row input { width: auto; }
+  .checkbox-row label { margin: 0; color: var(--text); font-size: 13px; }
+
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .theme-toggle, .lang-toggle {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    height: 34px; border-radius: 999px; padding: 0 12px; font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .theme-toggle { width: 34px; padding: 0; font-size: 15px; }
+  .theme-toggle:hover, .lang-toggle:hover { border-color: var(--accent); background: var(--panel); }
+
+  .empty { color: var(--muted); font-size: 13px; padding: 16px 4px; }
+  .breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+  .breadcrumb a { color: var(--accent); cursor: pointer; text-decoration: none; }
+  .section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .section-title h2 { font-size: 15px; margin: 0; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    background: transparent; color: var(--muted); border: none; border-radius: 0;
+    padding: 8px 4px; margin-right: 18px; font-size: 13px; font-weight: 500;
+    border-bottom: 2px solid transparent;
+  }
+  .tab-btn:hover { background: transparent; color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .vm-mini-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; }
+  .vm-mini-list .vm-mini-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .vm-mini-list .vm-mini-row:last-child { border-bottom: none; }
+
+  .error-list { margin-top: 10px; font-size: 13px; color: var(--danger); }
+  .error-list div { padding: 3px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <div>
+      <h1>VM IOPS Manager</h1>
+      <p class="subtitle" data-i18n="appSubtitle"></p>
+    </div>
+    <div class="header-actions">
+      <button class="lang-toggle" id="langToggle"></button>
+      <button class="theme-toggle" id="themeToggle" data-i18n-title="themeToggleTitle"></button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="vcenter-bar" id="vcenterBar"></div>
+  </div>
+
+  <div class="panel" id="searchPanel" style="display:none;">
+    <div class="tabs">
+      <button class="tab-btn active" id="tabVM" data-i18n="tabVM"></button>
+      <button class="tab-btn" id="tabPool" data-i18n="tabPool"></button>
+      <button class="tab-btn" id="tabDatastore" data-i18n="tabDatastore"></button>
+      <button class="tab-btn" id="tabCheck" data-i18n="tabCheck"></button>
+    </div>
+
+    <div id="vmSearchSection">
+      <div class="search-row">
+        <div class="radio-group">
+          <label><input type="radio" name="searchBy" value="name" checked> <span data-i18n="searchByName"></span></label>
+          <label><input type="radio" name="searchBy" value="id"> <span data-i18n="searchById"></span></label>
+        </div>
+        <div class="field" style="flex:2;">
+          <input type="text" id="searchInput" data-i18n-placeholder="vmSearchPlaceholder">
+        </div>
+        <button id="searchBtn" data-i18n="btnFind"></button>
+      </div>
+      <div id="vmResults"></div>
+    </div>
+
+    <div id="poolSearchSection" style="display:none;">
+      <div class="search-row">
+        <div class="field" style="flex:2;">
+          <input type="text" id="poolSearchInput" data-i18n-placeholder="poolSearchPlaceholder">
+        </div>
+        <button id="poolSearchBtn" data-i18n="btnFind"></button>
+      </div>
+      <div id="poolResults"></div>
+    </div>
+
+    <div id="datastoreSearchSection" style="display:none;">
+      <div class="search-row">
+        <div class="field" style="flex:2;">
+          <input type="text" id="datastoreSearchInput" data-i18n-placeholder="datastoreSearchPlaceholder">
+        </div>
+        <button id="datastoreSearchBtn" data-i18n="btnFind"></button>
+      </div>
+      <div id="datastoreResults"></div>
+    </div>
+
+    <div id="checkSearchSection" style="display:none;">
+      <p class="empty" id="checkDesc" style="padding:0 0 8px;"></p>
+      <textarea id="checkInput" rows="6" style="width:100%; font-family:monospace; font-size:13px; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text);" placeholder="[datastore1] vm1/vm1.vmx&#10;[datastore1] vm2/vm2_1.vmdk"></textarea>
+      <div class="search-row" style="margin-top:10px;">
+        <button id="checkBtn" data-i18n="btnCheck"></button>
+        <span class="empty" id="checkSummary" style="padding:0;"></span>
+      </div>
+      <div id="checkResults"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="disksPanel" style="display:none;">
+    <div class="breadcrumb">
+      <a id="backToSearch" data-i18n="backToResults"></a>
+    </div>
+    <div class="section-title">
+      <h2 id="diskVmName" data-i18n="disksDefaultHeading"></h2>
+      <button class="danger" id="resetAllBtn" data-i18n="btnResetAll"></button>
+    </div>
+    <div id="disksTable"></div>
+  </div>
+
+  <div class="panel" id="poolDetailPanel" style="display:none;">
+    <div class="breadcrumb">
+      <a id="backToPoolSearch" data-i18n="backToResults"></a>
+    </div>
+    <div class="section-title">
+      <h2 id="poolDetailName" data-i18n="poolDefaultHeading"></h2>
+      <button class="danger" id="poolResetAllBtn" data-i18n="btnPoolResetAll"></button>
+    </div>
+    <p class="empty" id="poolDetailHint"></p>
+    <div id="poolVMList"></div>
+    <div id="poolResetErrors"></div>
+  </div>
+
+  <div class="panel" id="datastoreDetailPanel" style="display:none;">
+    <div class="breadcrumb">
+      <a id="backToDatastoreSearch" data-i18n="backToResults"></a>
+    </div>
+    <div class="section-title">
+      <h2 id="datastoreDetailName" data-i18n="datastoreDefaultHeading"></h2>
+      <button class="danger" id="datastoreResetAllBtn" data-i18n="btnDatastoreResetAll"></button>
+    </div>
+    <p class="empty" id="datastoreDetailHint"></p>
+    <div id="datastoreDiskTable"></div>
+    <div id="datastoreResetErrors"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="connectModal">
+  <div class="modal">
+    <h2 data-i18n="modalTitle"></h2>
+    <div class="field">
+      <label data-i18n="labelAddress"></label>
+      <input type="text" id="mAddress" placeholder="vcenter.example.local">
+    </div>
+    <div class="field">
+      <label data-i18n="labelUsername"></label>
+      <input type="text" id="mUser" placeholder="user@vsphere.local">
+    </div>
+    <div class="field">
+      <label data-i18n="labelPassword"></label>
+      <input type="password" id="mPass">
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="mInsecure" checked>
+      <label for="mInsecure" data-i18n="checkboxInsecure"></label>
+    </div>
+    <div class="modal-error" id="mError" style="display:none;"></div>
+    <div class="actions">
+      <button class="secondary" id="mCancel" data-i18n="btnCancel"></button>
+      <button id="mConnect" data-i18n="btnConnect"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const state = {
+  vcenters: [], activeId: null,
+  currentVM: null, lastDisks: null,
+  currentPool: null, currentPoolVMs: null,
+  currentDatastore: null, currentDatastoreVMs: null,
+  lastVmResults: null, lastPoolResults: null, lastDatastoreResults: null, lastCheckResults: null,
+  lang: 'ru',
+};
+
+// ---- i18n ----
+
+const I18N = {
+  ru: {
+    appSubtitle: 'Управление лимитами IOPS на дисках виртуальных машин vCenter',
+    themeToggleTitle: 'Переключить тему',
+    tabVM: 'Виртуальные машины',
+    tabPool: 'Resource Pool',
+    tabDatastore: 'Датастор',
+    tabCheck: 'Проверка файлов',
+    searchByName: 'По имени',
+    searchById: 'По VM ID',
+    vmSearchPlaceholder: 'Введите имя (подстрока) или VM ID, например vm-1234',
+    btnFind: 'Найти',
+    poolSearchPlaceholder: 'Название resource pool (подстрока)',
+    datastoreSearchPlaceholder: 'Название датастора (подстрока)',
+    checkDesc: 'Вставьте пути к файлам (по одному в строке) — .vmx или .vmdk, например {example}. Инструмент проверит, зарегистрирован ли каждый файл хотя бы за одной ВМ.',
+    btnCheck: 'Проверить',
+    backToResults: '← к результатам поиска',
+    disksDefaultHeading: 'Диски ВМ',
+    btnResetAll: 'Сбросить все лимиты',
+    poolDefaultHeading: 'Resource Pool',
+    btnPoolResetAll: 'Сбросить лимиты у всех ВМ',
+    datastoreDefaultHeading: 'Датастор',
+    btnDatastoreResetAll: 'Сбросить лимиты на этом датасторе',
+    modalTitle: 'Подключение к vCenter',
+    labelAddress: 'Адрес (FQDN или IP)',
+    labelUsername: 'Логин',
+    labelPassword: 'Пароль',
+    checkboxInsecure: 'Игнорировать ошибки SSL-сертификата',
+    btnCancel: 'Отмена',
+    btnConnect: 'Подключиться',
+    toastClose: 'Закрыть',
+    sessionExpiredMsg: 'Сессия к {address} истекла, подключение закрыто. Введите пароль ещё раз, чтобы подключиться заново.',
+    vcDisconnectTitle: 'Отключить',
+    vcAddBtn: '+ Подключить vCenter',
+    disconnectedToast: 'Отключено',
+    modalFillAllFields: 'Заполните все поля.',
+    connectedToast: 'Подключено к {address}',
+    poolSearchValidation: 'Введите название resource pool для поиска',
+    searching: 'Поиск…',
+    nothingFound: 'Ничего не найдено.',
+    poolColName: 'Resource Pool',
+    poolColOwner: 'Кластер/хост',
+    btnOpen: 'Открыть →',
+    poolDetailNamePlain: 'Resource Pool: {name}',
+    poolDetailNameOwner: 'Resource Pool: {name} ({owner})',
+    loadingVmList: 'Загрузка списка ВМ…',
+    poolHintFound: 'Найдено ВМ непосредственно в этом пуле: {n}. Сброс затронет лимиты на всех дисках каждой из них. ВМ в дочерних resource pool сюда не входят и не затрагиваются.',
+    poolHintEmpty: 'В этом resource pool нет ВМ напрямую (ВМ в дочерних resource pool не учитываются).',
+    btnPoolResetAllCount: 'Сбросить лимиты у всех ВМ ({n})',
+    powerOn: 'включена',
+    powerOff: 'выключена',
+    poolResetConfirm: 'Сбросить лимиты IOPS на всех дисках у {n} ВМ в resource pool «{pool}»?\n\nКаждая ВМ сбрасывается отдельным запросом к vCenter, действие нельзя отменить одной кнопкой.',
+    resetDoneWithErrors: 'Готово с ошибками: ВМ обработано {vms}, дисков сброшено {disks}, ошибок {errs}',
+    resetDoneOk: 'Готово: сброшено дисков {disks} у {vms} ВМ',
+    datastoreSearchValidation: 'Введите название датастора для поиска',
+    datastoreColName: 'Датастор',
+    datastoreDetailNamePlain: 'Датастор: {name}',
+    loadingDatastoreVmsAndDisks: 'Загрузка списка ВМ и дисков на этом датасторе…',
+    datastoreHintFound: 'Найдено дисков: {disks} у {vms} ВМ. У этих ВМ могут быть и другие диски — на других датасторах, их сброс не затронет.',
+    datastoreHintEmpty: 'На этом датасторе не найдено дисков активных ВМ.',
+    btnDatastoreResetAllCount: 'Сбросить лимиты на этом датасторе ({n} дисков)',
+    colVM: 'ВМ',
+    colDisk: 'Диск',
+    colController: 'Контроллер',
+    colSizeGB: 'Размер, ГБ',
+    colCurrentLimit: 'Текущий лимит',
+    unlimited: 'без лимита',
+    datastoreResetConfirm: 'Сбросить лимиты IOPS на {disks} дисках (у {vms} ВМ), лежащих на датасторе «{ds}»?\n\nИзменятся только диски на этом датасторе — другие диски этих же ВМ не затрагиваются.',
+    checkInputValidation: 'Вставьте хотя бы один путь для проверки',
+    scanningAllVms: 'Сканирование всех ВМ vCenter, может занять некоторое время…',
+    checkSummaryChecked: 'Проверено: {n}. Zombie-файлов: {z}.',
+    checkSummaryNotFound: ' Файл не найден на датасторе: {n} — проверьте путь.',
+    checkSummaryNoDatastore: ' Датастор не найден в этом vCenter: {n} — проверьте, тот ли vCenter выбран.',
+    checkResultsEmpty: 'Нет результатов.',
+    checkColPath: 'Путь',
+    checkColType: 'Тип',
+    checkColStatus: 'Статус',
+    checkBadgeUnknown: 'не .vmx/.vmdk — пропущено',
+    checkBadgeNoDatastore: 'датастор не найден в этом vCenter',
+    checkBadgeNotFound: 'файл не найден на датасторе',
+    checkBadgeZombie: 'ZOMBIE — не найден ни у одной ВМ',
+    checkBadgeUsed: 'используется: {vms}',
+    vmSearchValidation: 'Введите значение для поиска',
+    colName: 'Имя',
+    colState: 'Состояние',
+    btnDisks: 'Диски →',
+    disksVmNamePlain: 'Диски ВМ: {name}',
+    loadingGeneric: 'Загрузка…',
+    noDisksForVm: 'У ВМ нет дисков.',
+    colIopsLimit: 'Лимит IOPS',
+    btnSave: 'Сохранить',
+    limitValidation: 'Значение должно быть -1 (без лимита) или неотрицательным числом',
+    limitSavedToast: 'Лимит для «{label}» изменён на {value}',
+    resetAllToast: 'Сброшено лимитов: {n}',
+  },
+  en: {
+    appSubtitle: 'Manage IOPS limits on vCenter virtual machine disks',
+    themeToggleTitle: 'Toggle theme',
+    tabVM: 'Virtual machines',
+    tabPool: 'Resource Pool',
+    tabDatastore: 'Datastore',
+    tabCheck: 'File check',
+    searchByName: 'By name',
+    searchById: 'By VM ID',
+    vmSearchPlaceholder: 'Enter a name (substring) or VM ID, e.g. vm-1234',
+    btnFind: 'Search',
+    poolSearchPlaceholder: 'Resource pool name (substring)',
+    datastoreSearchPlaceholder: 'Datastore name (substring)',
+    checkDesc: 'Paste file paths (one per line) — .vmx or .vmdk, e.g. {example}. The tool checks whether each file is registered to at least one VM.',
+    btnCheck: 'Check',
+    backToResults: '← back to search results',
+    disksDefaultHeading: 'VM disks',
+    btnResetAll: 'Reset all limits',
+    poolDefaultHeading: 'Resource Pool',
+    btnPoolResetAll: 'Reset limits for all VMs',
+    datastoreDefaultHeading: 'Datastore',
+    btnDatastoreResetAll: 'Reset limits on this datastore',
+    modalTitle: 'Connect to vCenter',
+    labelAddress: 'Address (FQDN or IP)',
+    labelUsername: 'Username',
+    labelPassword: 'Password',
+    checkboxInsecure: 'Ignore SSL certificate errors',
+    btnCancel: 'Cancel',
+    btnConnect: 'Connect',
+    toastClose: 'Close',
+    sessionExpiredMsg: 'The session to {address} expired and the connection was closed. Enter the password again to reconnect.',
+    vcDisconnectTitle: 'Disconnect',
+    vcAddBtn: '+ Connect vCenter',
+    disconnectedToast: 'Disconnected',
+    modalFillAllFields: 'Fill in all fields.',
+    connectedToast: 'Connected to {address}',
+    poolSearchValidation: 'Enter a resource pool name to search',
+    searching: 'Searching…',
+    nothingFound: 'Nothing found.',
+    poolColName: 'Resource Pool',
+    poolColOwner: 'Cluster/host',
+    btnOpen: 'Open →',
+    poolDetailNamePlain: 'Resource Pool: {name}',
+    poolDetailNameOwner: 'Resource Pool: {name} ({owner})',
+    loadingVmList: 'Loading VM list…',
+    poolHintFound: 'VMs directly in this pool: {n}. The reset will affect all disks of each of them. VMs in nested resource pools are excluded and not affected.',
+    poolHintEmpty: 'This resource pool has no VMs directly in it (VMs in nested resource pools are not counted).',
+    btnPoolResetAllCount: 'Reset limits for all VMs ({n})',
+    powerOn: 'powered on',
+    powerOff: 'powered off',
+    poolResetConfirm: 'Reset IOPS limits on all disks of {n} VM(s) in resource pool "{pool}"?\n\nEach VM is reset with a separate vCenter request; this action can\'t be undone with one click.',
+    resetDoneWithErrors: 'Done with errors: VMs processed {vms}, disks reset {disks}, errors {errs}',
+    resetDoneOk: 'Done: reset {disks} disk(s) on {vms} VM(s)',
+    datastoreSearchValidation: 'Enter a datastore name to search',
+    datastoreColName: 'Datastore',
+    datastoreDetailNamePlain: 'Datastore: {name}',
+    loadingDatastoreVmsAndDisks: 'Loading VMs and disks on this datastore…',
+    datastoreHintFound: 'Disks found: {disks} on {vms} VM(s). These VMs may have other disks on other datastores — the reset won\'t touch those.',
+    datastoreHintEmpty: 'No disks of active VMs were found on this datastore.',
+    btnDatastoreResetAllCount: 'Reset limits on this datastore ({n} disks)',
+    colVM: 'VM',
+    colDisk: 'Disk',
+    colController: 'Controller',
+    colSizeGB: 'Size, GB',
+    colCurrentLimit: 'Current limit',
+    unlimited: 'unlimited',
+    datastoreResetConfirm: 'Reset IOPS limits on {disks} disk(s) (on {vms} VM(s)) located on datastore "{ds}"?\n\nOnly disks on this datastore will change — other disks of the same VMs are not affected.',
+    checkInputValidation: 'Paste at least one path to check',
+    scanningAllVms: 'Scanning all vCenter VMs, this may take a while…',
+    checkSummaryChecked: 'Checked: {n}. Zombie files: {z}.',
+    checkSummaryNotFound: ' File not found on datastore: {n} — check the path.',
+    checkSummaryNoDatastore: ' Datastore not found in this vCenter: {n} — check that the right vCenter is selected.',
+    checkResultsEmpty: 'No results.',
+    checkColPath: 'Path',
+    checkColType: 'Type',
+    checkColStatus: 'Status',
+    checkBadgeUnknown: 'not .vmx/.vmdk — skipped',
+    checkBadgeNoDatastore: 'datastore not found in this vCenter',
+    checkBadgeNotFound: 'file not found on datastore',
+    checkBadgeZombie: 'ZOMBIE — not found on any VM',
+    checkBadgeUsed: 'used by: {vms}',
+    vmSearchValidation: 'Enter a value to search for',
+    colName: 'Name',
+    colState: 'State',
+    btnDisks: 'Disks →',
+    disksVmNamePlain: 'VM disks: {name}',
+    loadingGeneric: 'Loading…',
+    noDisksForVm: 'This VM has no disks.',
+    colIopsLimit: 'IOPS limit',
+    btnSave: 'Save',
+    limitValidation: 'The value must be -1 (unlimited) or a non-negative number',
+    limitSavedToast: 'Limit for "{label}" changed to {value}',
+    resetAllToast: 'Limits reset: {n}',
+  },
+};
+
+// t возвращает локализованную строку по ключу с подстановкой {var}-плейсхолдеров.
+// t returns the localized string for a key, substituting {var} placeholders.
+function t(key, vars) {
+  const dict = I18N[state.lang] || I18N.ru;
+  let str = dict[key] !== undefined ? dict[key] : (I18N.ru[key] !== undefined ? I18N.ru[key] : key);
+  if (vars) {
+    Object.keys(vars).forEach(k => { str = str.split('{' + k + '}').join(vars[k]); });
+  }
+  return str;
+}
+
+// applyStaticI18n обновляет весь статический текст разметки (data-i18n*),
+// не трогая динамически отрисованные таблицы/списки.
+// applyStaticI18n refreshes all static markup text (data-i18n*), leaving
+// dynamically rendered tables/lists untouched.
+function applyStaticI18n() {
+  document.documentElement.setAttribute('lang', state.lang);
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.getAttribute('data-i18n-placeholder')); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.getAttribute('data-i18n-title')); });
+
+  // checkDesc содержит встроенный пример пути как HTML (<code>…</code>), поэтому
+  // собирается через innerHTML напрямую из словаря, а не через textContent.
+  // checkDesc embeds an HTML example path (<code>…</code>), so it's built via
+  // innerHTML straight from the dictionary rather than via textContent.
+  const checkDescDict = I18N[state.lang] || I18N.ru;
+  document.getElementById('checkDesc').innerHTML = checkDescDict.checkDesc
+    .split('{example}').join('<code>[datastore1] vm1/vm1.vmx</code>');
+
+  document.getElementById('langToggle').textContent = state.lang === 'ru' ? 'EN' : 'RU';
+  updateThemeIcon();
+}
+
+// rerenderDynamic повторно отрисовывает уже загруженные данные (результаты
+// поиска, таблицы дисков) на новом языке — используется после переключения языка.
+// rerenderDynamic re-renders already-loaded data (search results, disk
+// tables) in the new language — used after switching languages.
+function rerenderDynamic() {
+  renderVCenterBar();
+
+  if (state.lastVmResults !== null) renderVMResults(state.lastVmResults);
+  if (state.lastPoolResults !== null) renderPoolResults(state.lastPoolResults);
+  if (state.lastDatastoreResults !== null) renderDatastoreResults(state.lastDatastoreResults);
+  if (state.lastCheckResults !== null) renderCheckResults(state.lastCheckResults);
+
+  if (state.currentVM) {
+    document.getElementById('diskVmName').textContent = t('disksVmNamePlain', { name: state.currentVM.name });
+    if (state.lastDisks !== null) renderDisks(state.lastDisks);
+  }
+  if (state.currentPool) {
+    renderPoolDetailUI(state.currentPoolVMs || []);
+  }
+  if (state.currentDatastore) {
+    renderDatastoreDetailUI(state.currentDatastoreVMs || []);
+  }
+}
+
+function applyLang(lang) {
+  state.lang = lang;
+  try { localStorage.setItem('lang', lang); } catch (e) {}
+  applyStaticI18n();
+  rerenderDynamic();
+}
+document.getElementById('langToggle').onclick = () => {
+  applyLang(state.lang === 'ru' ? 'en' : 'ru');
+};
+(function initLang() {
+  let saved = null;
+  try { saved = localStorage.getItem('lang'); } catch (e) {}
+  if (saved === 'ru' || saved === 'en') {
+    state.lang = saved;
+  } else {
+    state.lang = (navigator.language || '').toLowerCase().startsWith('ru') ? 'ru' : 'en';
+  }
+})();
+
+function hideToast() {
+  document.getElementById('toast').className = 'toast';
+}
+
+function toast(msg, ok) {
+  const box = document.getElementById('toast');
+  box.innerHTML = '';
+  const msgSpan = document.createElement('span');
+  msgSpan.className = 'toast-msg';
+  msgSpan.textContent = msg;
+  const closeSpan = document.createElement('span');
+  closeSpan.className = 'toast-close';
+  closeSpan.textContent = '✕';
+  closeSpan.title = t('toastClose');
+  closeSpan.addEventListener('click', hideToast);
+  box.appendChild(msgSpan);
+  box.appendChild(closeSpan);
+  box.className = 'toast show ' + (ok ? 'ok' : 'err');
+  clearTimeout(toast._t);
+  // Ошибки остаются до закрытия вручную; успешные действия скрываются автоматически.
+  // Errors stay until closed manually; successful actions auto-hide.
+  if (ok) {
+    toast._t = setTimeout(hideToast, 4000);
+  }
+}
+
+async function api(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ 'X-Auth-Token': TOKEN, 'X-Lang': state.lang, 'Content-Type': 'application/json' }, opts.headers || {});
+  const res = await fetch(path, opts);
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) {
+    if (data && data.sessionExpired) {
+      await handleSessionExpired();
+    }
+    const msg = (data && data.error) ? data.error : ('HTTP ' + res.status);
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// handleSessionExpired убирает подключение с истёкшей сессией из интерфейса
+// и открывает форму подключения с уже заполненными адресом и логином.
+// handleSessionExpired removes a connection whose session expired from the
+// UI and opens the connect form with the address and username pre-filled.
+async function handleSessionExpired() {
+  const dead = state.vcenters.find(v => v.id === state.activeId);
+  await loadVCenters();
+  if (dead) {
+    openModal();
+    document.getElementById('mAddress').value = dead.address;
+    document.getElementById('mUser').value = dead.username;
+    setModalError(t('sessionExpiredMsg', { address: dead.address }));
+    document.getElementById('mPass').focus();
+  }
+}
+
+function el(tag, attrs, children) {
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    if (k === 'text') e.textContent = attrs[k];
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  (children || []).forEach(c => e.appendChild(c));
+  return e;
+}
+
+// ---- Тема / Theme ----
+
+function systemPrefersDark() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function effectiveTheme() {
+  const override = document.documentElement.getAttribute('data-theme');
+  if (override) return override;
+  return systemPrefersDark() ? 'dark' : 'light';
+}
+function updateThemeIcon() {
+  document.getElementById('themeToggle').textContent = effectiveTheme() === 'dark' ? '☀️' : '🌙';
+}
+function applyTheme(theme) {
+  if (theme) document.documentElement.setAttribute('data-theme', theme);
+  else document.documentElement.removeAttribute('data-theme');
+  updateThemeIcon();
+}
+document.getElementById('themeToggle').onclick = () => {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try { localStorage.setItem('theme', next); } catch (e) {}
+};
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('theme'); } catch (e) {}
+  applyTheme(saved === 'dark' || saved === 'light' ? saved : null);
+})();
+
+// ---- vCenter switcher ----
+
+function resetPanelsForVCenterChange() {
+  document.getElementById('searchPanel').style.display = state.activeId ? '' : 'none';
+  document.getElementById('disksPanel').style.display = 'none';
+  document.getElementById('poolDetailPanel').style.display = 'none';
+  document.getElementById('datastoreDetailPanel').style.display = 'none';
+  state.currentVM = null;
+  state.lastDisks = null;
+  state.currentPool = null;
+  state.currentPoolVMs = null;
+  state.currentDatastore = null;
+  state.currentDatastoreVMs = null;
+  state.lastVmResults = null;
+  state.lastPoolResults = null;
+  state.lastDatastoreResults = null;
+  state.lastCheckResults = null;
+
+  // Результаты поиска относятся к предыдущему vCenter.
+  // Search results belong to the previous vCenter.
+  ['vmResults', 'poolResults', 'datastoreResults', 'checkResults'].forEach(id => {
+    const box = document.getElementById(id);
+    if (box) box.innerHTML = '';
+  });
+}
+
+async function loadVCenters() {
+  state.vcenters = await api('/api/vcenters');
+  if (!state.vcenters.find(v => v.id === state.activeId)) {
+    state.activeId = state.vcenters.length ? state.vcenters[0].id : null;
+  }
+  renderVCenterBar();
+  resetPanelsForVCenterChange();
+}
+
+function renderVCenterBar() {
+  const bar = document.getElementById('vcenterBar');
+  bar.innerHTML = '';
+  state.vcenters.forEach(v => {
+    const pill = el('div', {
+      class: 'vc-pill' + (v.id === state.activeId ? ' active' : ''),
+      onclick: () => { state.activeId = v.id; renderVCenterBar(); resetPanelsForVCenterChange(); }
+    }, [
+      el('span', { text: v.address + ' (' + v.username + ')' }),
+      el('span', { class: 'x', title: t('vcDisconnectTitle'), onclick: async (ev) => { ev.stopPropagation(); await disconnectVC(v.id); } , text: '✕' })
+    ]);
+    bar.appendChild(pill);
+  });
+  bar.appendChild(el('button', { class: 'vc-add', onclick: openModal, text: t('vcAddBtn') }));
+}
+
+async function disconnectVC(id) {
+  try {
+    await api('/api/disconnect', { method: 'POST', body: JSON.stringify({ id }) });
+    toast(t('disconnectedToast'), true);
+    await loadVCenters();
+  } catch (e) { toast(e.message, false); }
+}
+
+function setModalError(msg) {
+  const box = document.getElementById('mError');
+  if (!msg) {
+    box.style.display = 'none';
+    box.textContent = '';
+  } else {
+    box.style.display = '';
+    box.textContent = msg;
+  }
+}
+
+function openModal() {
+  setModalError(null);
+  document.getElementById('connectModal').classList.add('show');
+  document.getElementById('mAddress').focus();
+}
+function closeModal() {
+  document.getElementById('connectModal').classList.remove('show');
+  setModalError(null);
+}
+document.getElementById('mCancel').onclick = closeModal;
+
+async function attemptConnect() {
+  const address = document.getElementById('mAddress').value.trim();
+  const username = document.getElementById('mUser').value.trim();
+  const password = document.getElementById('mPass').value;
+  const insecure = document.getElementById('mInsecure').checked;
+  setModalError(null);
+  if (!address || !username || !password) { setModalError(t('modalFillAllFields')); return; }
+  const btn = document.getElementById('mConnect');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const info = await api('/api/connect', { method: 'POST', body: JSON.stringify({ address, username, password, insecure }) });
+    document.getElementById('mPass').value = '';
+    closeModal();
+    state.activeId = info.id;
+    await loadVCenters();
+    toast(t('connectedToast', { address: info.address }), true);
+  } catch (e) {
+    // Ошибку подключения показываем прямо в форме, а не только тостом.
+    // Connect errors are shown inline in the form, not only as a toast.
+    setModalError(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('mConnect').onclick = attemptConnect;
+
+// Enter в любом поле формы подключения запускает подключение, как по кнопке.
+// Enter in any connect-form field triggers connect, same as clicking the button.
+['mAddress', 'mUser', 'mPass'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); attemptConnect(); }
+  });
+});
+
+// ---- Вкладки: ВМ / Resource Pool / Датастор / Проверка файлов ----
+// ---- Tabs: VM / Resource Pool / Datastore / File check ----
+
+function switchTab(which) {
+  document.getElementById('tabVM').classList.toggle('active', which === 'vm');
+  document.getElementById('tabPool').classList.toggle('active', which === 'pool');
+  document.getElementById('tabDatastore').classList.toggle('active', which === 'datastore');
+  document.getElementById('tabCheck').classList.toggle('active', which === 'check');
+  document.getElementById('vmSearchSection').style.display = which === 'vm' ? '' : 'none';
+  document.getElementById('poolSearchSection').style.display = which === 'pool' ? '' : 'none';
+  document.getElementById('datastoreSearchSection').style.display = which === 'datastore' ? '' : 'none';
+  document.getElementById('checkSearchSection').style.display = which === 'check' ? '' : 'none';
+}
+document.getElementById('tabVM').onclick = () => switchTab('vm');
+document.getElementById('tabPool').onclick = () => switchTab('pool');
+document.getElementById('tabDatastore').onclick = () => switchTab('datastore');
+document.getElementById('tabCheck').onclick = () => switchTab('check');
+
+// ---- Resource Pool: поиск и массовый сброс / search and bulk reset ----
+
+document.getElementById('poolSearchBtn').onclick = doPoolSearch;
+document.getElementById('poolSearchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') doPoolSearch(); });
+
+async function doPoolSearch() {
+  if (!state.activeId) return;
+  const q = document.getElementById('poolSearchInput').value.trim();
+  if (!q) { toast(t('poolSearchValidation'), false); return; }
+  const box = document.getElementById('poolResults');
+  box.innerHTML = '<p class="empty">' + t('searching') + '</p>';
+  try {
+    const pools = await api('/api/resourcepools?vcenter=' + encodeURIComponent(state.activeId) + '&query=' + encodeURIComponent(q));
+    state.lastPoolResults = pools;
+    renderPoolResults(pools);
+  } catch (e) {
+    box.innerHTML = '';
+    toast(e.message, false);
+  }
+}
+
+function renderPoolResults(pools) {
+  const box = document.getElementById('poolResults');
+  box.innerHTML = '';
+  if (!pools || !pools.length) { box.appendChild(el('p', { class: 'empty', text: t('nothingFound') })); return; }
+
+  const table = el('table', {}, [
+    el('thead', {}, [el('tr', {}, [el('th', { text: t('poolColName') }), el('th', { text: t('poolColOwner') }), el('th', { text: '' })])]),
+  ]);
+  const tbody = el('tbody');
+  pools.forEach(p => {
+    const tr = el('tr', { class: 'clickable', onclick: () => openPool(p) }, [
+      el('td', { text: p.name }),
+      el('td', { text: p.owner || '—' }),
+      el('td', {}, [el('button', { class: 'small secondary', onclick: (ev) => { ev.stopPropagation(); openPool(p); }, text: t('btnOpen') })]),
+    ]);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+document.getElementById('backToPoolSearch').onclick = () => {
+  document.getElementById('poolDetailPanel').style.display = 'none';
+  document.getElementById('searchPanel').style.display = '';
+};
+
+function renderPoolDetailUI(vms) {
+  const pool = state.currentPool;
+  document.getElementById('poolDetailName').textContent = pool.owner
+    ? t('poolDetailNameOwner', { name: pool.name, owner: pool.owner })
+    : t('poolDetailNamePlain', { name: pool.name });
+
+  const hint = document.getElementById('poolDetailHint');
+  const resetBtn = document.getElementById('poolResetAllBtn');
+  hint.textContent = vms.length ? t('poolHintFound', { n: vms.length }) : t('poolHintEmpty');
+  resetBtn.textContent = t('btnPoolResetAllCount', { n: vms.length });
+  resetBtn.disabled = vms.length === 0;
+  renderPoolVMList(vms);
+}
+
+async function openPool(pool) {
+  state.currentPool = pool;
+  state.currentPoolVMs = null;
+  document.getElementById('searchPanel').style.display = 'none';
+  document.getElementById('poolDetailPanel').style.display = '';
+  document.getElementById('poolDetailName').textContent = pool.owner
+    ? t('poolDetailNameOwner', { name: pool.name, owner: pool.owner })
+    : t('poolDetailNamePlain', { name: pool.name });
+  document.getElementById('poolResetErrors').innerHTML = '';
+
+  const listBox = document.getElementById('poolVMList');
+  const hint = document.getElementById('poolDetailHint');
+  const resetBtn = document.getElementById('poolResetAllBtn');
+  resetBtn.disabled = true;
+  resetBtn.textContent = t('btnPoolResetAll');
+  hint.textContent = t('loadingVmList');
+  listBox.innerHTML = '';
+
+  try {
+    const vms = await api('/api/resourcepool-vms?vcenter=' + encodeURIComponent(state.activeId) + '&pool=' + encodeURIComponent(pool.ref));
+    state.currentPoolVMs = vms;
+    renderPoolDetailUI(vms);
+  } catch (e) {
+    hint.textContent = '';
+    toast(e.message, false);
+  }
+}
+
+function renderPoolVMList(vms) {
+  const box = document.getElementById('poolVMList');
+  box.innerHTML = '';
+  if (!vms.length) return;
+  const list = el('div', { class: 'vm-mini-list' });
+  vms.forEach(vm => {
+    list.appendChild(el('div', { class: 'vm-mini-row' }, [
+      el('span', { text: vm.name }),
+      el('span', { class: 'badge ' + (vm.powerState === 'poweredOn' ? 'on' : 'off'), text: vm.powerState === 'poweredOn' ? t('powerOn') : t('powerOff') }),
+    ]));
+  });
+  box.appendChild(list);
+}
+
+document.getElementById('poolResetAllBtn').onclick = async () => {
+  if (!state.currentPool) return;
+  const vms = state.currentPoolVMs || [];
+  const confirmed = confirm(t('poolResetConfirm', { n: vms.length, pool: state.currentPool.name }));
+  if (!confirmed) return;
+
+  const btn = document.getElementById('poolResetAllBtn');
+  btn.disabled = true;
+  document.getElementById('poolResetErrors').innerHTML = '';
+  try {
+    const res = await api('/api/resourcepool-reset-all', { method: 'POST', body: JSON.stringify({ vcenter: state.activeId, pool: state.currentPool.ref }) });
+    if (res.errors && res.errors.length) {
+      toast(t('resetDoneWithErrors', { vms: res.vms, disks: res.disksReset, errs: res.errors.length }), false);
+      const errBox = document.getElementById('poolResetErrors');
+      errBox.appendChild(el('div', { class: 'error-list' }, res.errors.map(e => el('div', { text: '✕ ' + e.vm + ': ' + e.error }))));
+    } else {
+      toast(t('resetDoneOk', { disks: res.disksReset, vms: res.vms }), true);
+    }
+  } catch (e) {
+    toast(e.message, false);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+// ---- Датастор: поиск и точечный сброс лимитов только на его дисках ----
+// ---- Datastore: search and targeted reset of only its disks ----
+
+document.getElementById('datastoreSearchBtn').onclick = doDatastoreSearch;
+document.getElementById('datastoreSearchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') doDatastoreSearch(); });
+
+async function doDatastoreSearch() {
+  if (!state.activeId) return;
+  const q = document.getElementById('datastoreSearchInput').value.trim();
+  if (!q) { toast(t('datastoreSearchValidation'), false); return; }
+  const box = document.getElementById('datastoreResults');
+  box.innerHTML = '<p class="empty">' + t('searching') + '</p>';
+  try {
+    const stores = await api('/api/datastores?vcenter=' + encodeURIComponent(state.activeId) + '&query=' + encodeURIComponent(q));
+    state.lastDatastoreResults = stores;
+    renderDatastoreResults(stores);
+  } catch (e) {
+    box.innerHTML = '';
+    toast(e.message, false);
+  }
+}
+
+function renderDatastoreResults(stores) {
+  const box = document.getElementById('datastoreResults');
+  box.innerHTML = '';
+  if (!stores || !stores.length) { box.appendChild(el('p', { class: 'empty', text: t('nothingFound') })); return; }
+
+  const table = el('table', {}, [
+    el('thead', {}, [el('tr', {}, [el('th', { text: t('datastoreColName') }), el('th', { text: '' })])]),
+  ]);
+  const tbody = el('tbody');
+  stores.forEach(ds => {
+    const tr = el('tr', { class: 'clickable', onclick: () => openDatastore(ds) }, [
+      el('td', { text: ds.name }),
+      el('td', {}, [el('button', { class: 'small secondary', onclick: (ev) => { ev.stopPropagation(); openDatastore(ds); }, text: t('btnOpen') })]),
+    ]);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+document.getElementById('backToDatastoreSearch').onclick = () => {
+  document.getElementById('datastoreDetailPanel').style.display = 'none';
+  document.getElementById('searchPanel').style.display = '';
+};
+
+function countDatastoreDisks(vms) {
+  return vms.reduce((sum, vm) => sum + vm.disks.length, 0);
+}
+
+function renderDatastoreDetailUI(vms) {
+  document.getElementById('datastoreDetailName').textContent = t('datastoreDetailNamePlain', { name: state.currentDatastore.name });
+
+  const hint = document.getElementById('datastoreDetailHint');
+  const resetBtn = document.getElementById('datastoreResetAllBtn');
+  const diskCount = countDatastoreDisks(vms);
+  hint.textContent = vms.length ? t('datastoreHintFound', { disks: diskCount, vms: vms.length }) : t('datastoreHintEmpty');
+  resetBtn.textContent = t('btnDatastoreResetAllCount', { n: diskCount });
+  resetBtn.disabled = diskCount === 0;
+  renderDatastoreDiskTable(vms);
+}
+
+async function openDatastore(ds) {
+  state.currentDatastore = ds;
+  state.currentDatastoreVMs = null;
+  document.getElementById('searchPanel').style.display = 'none';
+  document.getElementById('datastoreDetailPanel').style.display = '';
+  document.getElementById('datastoreDetailName').textContent = t('datastoreDetailNamePlain', { name: ds.name });
+  document.getElementById('datastoreResetErrors').innerHTML = '';
+
+  const tableBox = document.getElementById('datastoreDiskTable');
+  const hint = document.getElementById('datastoreDetailHint');
+  const resetBtn = document.getElementById('datastoreResetAllBtn');
+  resetBtn.disabled = true;
+  resetBtn.textContent = t('btnDatastoreResetAll');
+  hint.textContent = t('loadingDatastoreVmsAndDisks');
+  tableBox.innerHTML = '';
+
+  try {
+    const vms = await api('/api/datastore-vms?vcenter=' + encodeURIComponent(state.activeId) + '&datastore=' + encodeURIComponent(ds.ref));
+    state.currentDatastoreVMs = vms;
+    renderDatastoreDetailUI(vms);
+  } catch (e) {
+    hint.textContent = '';
+    toast(e.message, false);
+  }
+}
+
+function renderDatastoreDiskTable(vms) {
+  const box = document.getElementById('datastoreDiskTable');
+  box.innerHTML = '';
+  if (!vms.length) return;
+
+  const table = el('table', {}, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { text: t('colVM') }),
+      el('th', { text: t('colDisk') }),
+      el('th', { text: t('colController') }),
+      el('th', { text: t('colSizeGB') }),
+      el('th', { text: t('colCurrentLimit') }),
+    ])]),
+  ]);
+  const tbody = el('tbody');
+  vms.forEach(vm => {
+    vm.disks.forEach((d, i) => {
+      const diskLabel = d.scsiAddress ? (d.label + ' (' + d.scsiAddress + ')') : d.label;
+      tbody.appendChild(el('tr', {}, [
+        el('td', { text: i === 0 ? vm.vmName : '' }),
+        el('td', { text: diskLabel }),
+        el('td', { text: d.controller || '—' }),
+        el('td', { text: d.sizeGB.toFixed(1) }),
+        el('td', { text: d.limit === -1 ? t('unlimited') : String(d.limit) }),
+      ]));
+    });
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+document.getElementById('datastoreResetAllBtn').onclick = async () => {
+  if (!state.currentDatastore) return;
+  const vms = state.currentDatastoreVMs || [];
+  const diskCount = countDatastoreDisks(vms);
+  const confirmed = confirm(t('datastoreResetConfirm', { disks: diskCount, vms: vms.length, ds: state.currentDatastore.name }));
+  if (!confirmed) return;
+
+  const btn = document.getElementById('datastoreResetAllBtn');
+  btn.disabled = true;
+  document.getElementById('datastoreResetErrors').innerHTML = '';
+  try {
+    const res = await api('/api/datastore-reset-all', { method: 'POST', body: JSON.stringify({ vcenter: state.activeId, datastore: state.currentDatastore.ref }) });
+    if (res.errors && res.errors.length) {
+      toast(t('resetDoneWithErrors', { vms: res.vms, disks: res.disksReset, errs: res.errors.length }), false);
+      const errBox = document.getElementById('datastoreResetErrors');
+      errBox.appendChild(el('div', { class: 'error-list' }, res.errors.map(e => el('div', { text: '✕ ' + e.vm + ': ' + e.error }))));
+    } else {
+      toast(t('resetDoneOk', { disks: res.disksReset, vms: res.vms }), true);
+    }
+    // Обновим таблицу, чтобы увидеть новые значения лимитов.
+    // Refresh the table to show the new limit values right away.
+    await openDatastore(state.currentDatastore);
+  } catch (e) {
+    toast(e.message, false);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+// ---- Проверка файлов на "зомби" (orphaned vmx/vmdk) ----
+// ---- Checking files for "zombie" status (orphaned vmx/vmdk) ----
+
+document.getElementById('checkBtn').onclick = doCheckPaths;
+
+async function doCheckPaths() {
+  if (!state.activeId) return;
+  const raw = document.getElementById('checkInput').value;
+  const paths = raw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  if (!paths.length) { toast(t('checkInputValidation'), false); return; }
+
+  const btn = document.getElementById('checkBtn');
+  const summary = document.getElementById('checkSummary');
+  const box = document.getElementById('checkResults');
+  btn.disabled = true;
+  summary.textContent = '';
+  box.innerHTML = '<p class="empty">' + t('scanningAllVms') + '</p>';
+  try {
+    const results = await api('/api/check-paths', { method: 'POST', body: JSON.stringify({ vcenter: state.activeId, paths }) });
+    state.lastCheckResults = results;
+    renderCheckResults(results);
+    const zombies = results.filter(r => r.zombie).length;
+    const noDatastore = results.filter(r => r.kind !== 'unknown' && !r.datastoreFound).length;
+    const notFound = results.filter(r => r.kind !== 'unknown' && r.datastoreFound && !r.fileExists).length;
+    let text = t('checkSummaryChecked', { n: results.length, z: zombies });
+    if (notFound > 0) text += t('checkSummaryNotFound', { n: notFound });
+    if (noDatastore > 0) text += t('checkSummaryNoDatastore', { n: noDatastore });
+    summary.textContent = text;
+  } catch (e) {
+    box.innerHTML = '';
+    toast(e.message, false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderCheckResults(results) {
+  const box = document.getElementById('checkResults');
+  box.innerHTML = '';
+  if (!results.length) { box.appendChild(el('p', { class: 'empty', text: t('checkResultsEmpty') })); return; }
+
+  const table = el('table', {}, [
+    el('thead', {}, [el('tr', {}, [el('th', { text: t('checkColPath') }), el('th', { text: t('checkColType') }), el('th', { text: t('checkColStatus') })])]),
+  ]);
+  const tbody = el('tbody');
+  results.forEach(r => {
+    let statusBadge;
+    if (r.kind === 'unknown') {
+      statusBadge = el('span', { class: 'badge unknown-type', text: t('checkBadgeUnknown') });
+    } else if (!r.datastoreFound) {
+      statusBadge = el('span', { class: 'badge warn', text: t('checkBadgeNoDatastore') });
+    } else if (!r.fileExists) {
+      statusBadge = el('span', { class: 'badge warn', text: t('checkBadgeNotFound') });
+    } else if (r.zombie) {
+      statusBadge = el('span', { class: 'badge zombie', text: t('checkBadgeZombie') });
+    } else {
+      statusBadge = el('span', { class: 'badge used', text: t('checkBadgeUsed', { vms: r.vms.join(', ') }) });
+    }
+    tbody.appendChild(el('tr', {}, [
+      el('td', { text: r.path }),
+      el('td', { text: r.kind === 'unknown' ? '—' : r.kind }),
+      el('td', {}, [statusBadge]),
+    ]));
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+// ---- VM search ----
+
+document.getElementById('searchBtn').onclick = doSearch;
+document.getElementById('searchInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+async function doSearch() {
+  if (!state.activeId) return;
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) { toast(t('vmSearchValidation'), false); return; }
+  const byId = document.querySelector('input[name=searchBy]:checked').value === 'id';
+  const box = document.getElementById('vmResults');
+  box.innerHTML = '<p class="empty">' + t('searching') + '</p>';
+  try {
+    const vms = await api('/api/vms?vcenter=' + encodeURIComponent(state.activeId) + '&query=' + encodeURIComponent(q) + '&byId=' + byId);
+    state.lastVmResults = vms;
+    renderVMResults(vms);
+  } catch (e) {
+    box.innerHTML = '';
+    toast(e.message, false);
+  }
+}
+
+function renderVMResults(vms) {
+  const box = document.getElementById('vmResults');
+  box.innerHTML = '';
+  if (!vms || !vms.length) { box.appendChild(el('p', { class: 'empty', text: t('nothingFound') })); return; }
+
+  const table = el('table', {}, [
+    el('thead', {}, [el('tr', {}, [el('th', { text: t('colName') }), el('th', { text: t('colState') }), el('th', { text: '' })])]),
+  ]);
+  const tbody = el('tbody');
+  vms.forEach(vm => {
+    const tr = el('tr', { class: 'clickable', onclick: () => openVM(vm) }, [
+      el('td', { text: vm.name }),
+      el('td', {}, [el('span', { class: 'badge ' + (vm.powerState === 'poweredOn' ? 'on' : 'off'), text: vm.powerState === 'poweredOn' ? t('powerOn') : t('powerOff') })]),
+      el('td', {}, [el('button', { class: 'small secondary', onclick: (ev) => { ev.stopPropagation(); openVM(vm); }, text: t('btnDisks') })]),
+    ]);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+document.getElementById('backToSearch').onclick = () => {
+  document.getElementById('disksPanel').style.display = 'none';
+  document.getElementById('searchPanel').style.display = '';
+};
+
+async function openVM(vm) {
+  state.currentVM = vm;
+  state.lastDisks = null;
+  document.getElementById('searchPanel').style.display = 'none';
+  document.getElementById('disksPanel').style.display = '';
+  document.getElementById('diskVmName').textContent = t('disksVmNamePlain', { name: vm.name });
+  await loadDisks();
+}
+
+async function loadDisks() {
+  const box = document.getElementById('disksTable');
+  box.innerHTML = '<p class="empty">' + t('loadingGeneric') + '</p>';
+  try {
+    const disks = await api('/api/disks?vcenter=' + encodeURIComponent(state.activeId) + '&vm=' + encodeURIComponent(state.currentVM.ref));
+    state.lastDisks = disks;
+    renderDisks(disks);
+  } catch (e) {
+    box.innerHTML = '';
+    toast(e.message, false);
+  }
+}
+
+function renderDisks(disks) {
+  const box = document.getElementById('disksTable');
+  box.innerHTML = '';
+  if (!disks || !disks.length) { box.appendChild(el('p', { class: 'empty', text: t('noDisksForVm') })); return; }
+
+  const table = el('table', {}, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { text: t('colDisk') }),
+      el('th', { text: t('colController') }),
+      el('th', { text: t('colSizeGB') }),
+      el('th', { text: t('colIopsLimit') }),
+    ])]),
+  ]);
+  const tbody = el('tbody');
+  disks.forEach(d => {
+    const input = el('input', { type: 'number', value: d.limit, min: '-1' });
+    const saveBtn = el('button', { class: 'small', text: t('btnSave') });
+    saveBtn.onclick = async () => {
+      const val = parseInt(input.value, 10);
+      if (isNaN(val) || val < -1) { toast(t('limitValidation'), false); return; }
+      saveBtn.disabled = true;
+      try {
+        await api('/api/disk-limit', { method: 'POST', body: JSON.stringify({ vcenter: state.activeId, vm: state.currentVM.ref, key: d.key, limit: val }) });
+        toast(t('limitSavedToast', { label: d.label, value: val === -1 ? 'Unlimited' : val }), true);
+        await loadDisks();
+      } catch (e) {
+        toast(e.message, false);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    };
+    const cell = el('div', { class: 'limit-cell' }, [input, saveBtn]);
+    if (d.limit === -1) {
+      cell.appendChild(el('span', { class: 'limit-unlimited', text: '(' + t('unlimited') + ')' }));
+    }
+    const diskLabel = d.scsiAddress ? (d.label + ' (' + d.scsiAddress + ')') : d.label;
+    const tr = el('tr', {}, [
+      el('td', { text: diskLabel }),
+      el('td', { text: d.controller || '—' }),
+      el('td', { text: d.sizeGB.toFixed(1) }),
+      el('td', {}, [cell]),
+    ]);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  box.appendChild(table);
+}
+
+document.getElementById('resetAllBtn').onclick = async () => {
+  if (!state.currentVM) return;
+  const btn = document.getElementById('resetAllBtn');
+  btn.disabled = true;
+  try {
+    const res = await api('/api/reset-all', { method: 'POST', body: JSON.stringify({ vcenter: state.activeId, vm: state.currentVM.ref }) });
+    toast(t('resetAllToast', { n: res.reset }), true);
+    await loadDisks();
+  } catch (e) {
+    toast(e.message, false);
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+applyStaticI18n();
+loadVCenters();
+</script>
+</body>
+</html>
