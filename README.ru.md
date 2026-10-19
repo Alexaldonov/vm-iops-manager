@@ -35,7 +35,7 @@
 интерфейсом. Закрытие консольного окна останавливает сервер.
 
 Никакой установки, PowerShell и PowerCLI не требуется — весь код запроса
-к vCenter (govmomi, официальная Go-библиотека VMware) зашит в exe.
+к vCenter ([govmomi](https://github.com/vmware/govmomi), официальная Go-библиотека VMware) зашит в exe.
 
 ## Возможности интерфейса
 
